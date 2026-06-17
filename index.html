@@ -100,8 +100,8 @@
 
     <div style="position: absolute; top: 20px; right: 20px;">
         <select id="langSelect" onchange="changeLanguage()" style="background: var(--panel); color: white; border: 1px solid #444; padding: 10px; border-radius: 12px; cursor: pointer;">
+            <option value="en" selected>English 🇺🇸</option>
             <option value="ru">Русский 🇷🇺</option>
-            <option value="en">English 🇺🇸</option>
             <option value="uk">Українська 🇺🇦</option>
             <option value="de">Deutsch 🇩🇪</option>
             <option value="fr">Français 🇫🇷</option>
@@ -161,6 +161,31 @@
         let bestExp = 1, countExp = 1;
         let historyData = []; // Объект: { val, isExp }
 
+        const SAVE_KEY = 'luckyGrowSave';
+
+        function saveState() {
+            try {
+                localStorage.setItem(SAVE_KEY, JSON.stringify({
+                    bestNormal, countNormal, bestExp, countExp, historyData,
+                    lang: document.getElementById('langSelect').value
+                }));
+            } catch (e) { /* storage unavailable (e.g. private mode) */ }
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(SAVE_KEY);
+                if (!raw) return;
+                const s = JSON.parse(raw);
+                bestNormal = s.bestNormal ?? 1;
+                countNormal = s.countNormal ?? 1;
+                bestExp = s.bestExp ?? 1;
+                countExp = s.countExp ?? 1;
+                historyData = Array.isArray(s.historyData) ? s.historyData : [];
+                if (s.lang) document.getElementById('langSelect').value = s.lang;
+            } catch (e) { /* ignore corrupt save */ }
+        }
+
         const i18n = {
             ru: { push: "ЖМИ", rec: "РЕКОРД", expRec: "ЭКСП. РЕКОРД", in: "из", label: "ШАНС УСПЕХА", exp: "Экспериментальный режим", reset: "СБРОС", hist: "ТОП ВЫПАДЕНИЙ", confirm: "Сбросить текущий рекорд?" },
             en: { push: "PUSH", rec: "RECORD", expRec: "EXP. RECORD", in: "in", label: "SET CHANCE", exp: "Experimental Mode", reset: "RESET", hist: "TOP DROPS", confirm: "Reset current record?" },
@@ -214,6 +239,7 @@
                     else if (currentStr === bestNormal.toFixed(2)) countNormal++;
                 }
                 updateBestVisuals();
+                saveState();
             } else {
                 resetGame();
                 const display = document.getElementById('chance-display');
@@ -278,6 +304,7 @@
             renderHistory();
             updateBestVisuals();
             updateDisplayVisuals(currentChance);
+            saveState();
         }
 
         function toggleExpMode() {
@@ -297,6 +324,7 @@
                 if (document.getElementById('expCheck').checked) { bestExp = 1; countExp = 1; }
                 else { bestNormal = 1; countNormal = 1; }
                 updateBestVisuals();
+                saveState();
             }
         }
 
@@ -338,7 +366,9 @@
             pressMainButton();
         });
 
+        loadState();
         changeLanguage();
+        renderHistory();
     </script>
 </body>
 </html>
