@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Elite RNG Simulator - Global Edition</title>
+    <style>
+        :root {
+            --primary: #00ffcc;
+            --accent: #ffcc00;
+            --exp: #ff00ff;
+            --bg: #050505;
+            --panel: rgba(20, 20, 20, 0.8);
+        }
+
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100vh; margin: 0; overflow: hidden;
+        }
+
+        /* Панель истории */
+        .history-panel {
+            position: absolute; left: 20px; top: 40px; bottom: 40px; width: 280px;
+            background: var(--panel); backdrop-filter: blur(15px); border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px;
+            display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .history-title {
+            font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 15px; color: var(--accent); text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
+        }
+
+        #historyList { overflow-y: auto; flex-grow: 1; }
+
+        .history-item {
+            background: rgba(255,255,255,0.05); margin-bottom: 8px; padding: 12px;
+            border-radius: 12px; border-left: 4px solid var(--primary);
+            font-family: 'Courier New', monospace; font-weight: bold;
+            display: flex; justify-content: space-between; align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .history-item.is-exp { border-left-color: var(--exp); }
+        .history-item.top-rank {
+            border-left-color: var(--accent); background: rgba(255, 204, 0, 0.1);
+            transform: scale(1.02); box-shadow: 0 0 15px rgba(255, 204, 0, 0.1);
+        }
+
+        .exp-tag { font-size: 10px; color: var(--exp); border: 1px solid var(--exp); padding: 1px 4px; border-radius: 4px; margin-left: 5px; }
+
+        /* Настройки */
+        .settings-card {
+            background: var(--panel); backdrop-filter: blur(20px); padding: 25px;
+            border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            margin-bottom: 30px;
+        }
+
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 8px; background: #333; border-radius: 10px; margin: 20px 0; outline: none; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; background: white;
+            border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px var(--primary);
+        }
+
+        input[type="number"] {
+            background: rgba(0,0,0,0.3); border: 1px solid #444; color: white;
+            padding: 8px; border-radius: 8px; width: 90px; text-align: center; font-size: 18px;
+        }
+
+        /* Дисплей */
+        #chance-display {
+            font-size: 64px; font-weight: 900; margin: 20px 0; color: var(--primary);
+            text-shadow: 0 0 30px rgba(0, 255, 204, 0.4); transition: transform 0.2s;
+        }
+
+        button#mainButton {
+            padding: 22px 80px; font-size: 32px; cursor: pointer; background: white;
+            color: black; border: none; border-radius: 50px; font-weight: 900;
+            box-shadow: 0 10px 0 #ddd; transition: all 0.1s; margin-bottom: 30px;
+        }
+        button#mainButton:active,
+        button#mainButton.key-active { transform: translateY(6px); box-shadow: 0 4px 0 #ddd; }
+
+        .record-box {
+            background: rgba(255,255,255,0.03); padding: 15px 40px;
+            border-radius: 100px; border: 1px solid rgba(255,255,255,0.05);
+            display: flex; align-items: center; gap: 15px;
+        }
+
+        .multiplier { background: var(--accent); color: black; padding: 2px 10px; border-radius: 6px; font-weight: 900; }
+
+        .reset-btn { background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.2); padding: 6px 15px; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div style="position: absolute; top: 20px; right: 20px;">
+        <select id="langSelect" onchange="changeLanguage()" style="background: var(--panel); color: white; border: 1px solid #444; padding: 10px; border-radius: 12px; cursor: pointer;">
+            <option value="ru">Русский 🇷🇺</option>
+            <option value="en">English 🇺🇸</option>
+            <option value="uk">Українська 🇺🇦</option>
+            <option value="de">Deutsch 🇩🇪</option>
+            <option value="fr">Français 🇫🇷</option>
+            <option value="es">Español 🇪🇸</option>
+            <option value="it">Italiano 🇮🇹</option>
+            <option value="pt">Português 🇵🇹</option>
+            <option value="pl">Polski 🇵🇱</option>
+            <option value="tr">Türkçe 🇹🇷</option>
+            <option value="nl">Nederlands 🇳🇱</option>
+            <option value="sv">Svenska 🇸🇪</option>
+            <option value="no">Norsk 🇳🇴</option>
+            <option value="da">Dansk 🇩🇰</option>
+            <option value="fi">Suomi 🇫🇮</option>
+            <option value="el">Ελληνικά 🇬🇷</option>
+            <option value="zh">中文 🇨🇳</option>
+            <option value="jp">日本語 🇯🇵</option>
+            <option value="ko">한국어 🇰🇷</option>
+            <option value="ar">العربية 🇸🇦</option>
+            <option value="hi">हिन्दी 🇮🇳</option>
+            <option value="vi">Tiếng Việt 🇻🇳</option>
+            <option value="is">Íslenska 🇮🇸</option>
+        </select>
+    </div>
+
+    <div class="history-panel">
+        <div class="history-title" id="histTitle">TOP DROPS</div>
+        <div id="historyList"></div>
+    </div>
+
+    <div class="settings-card">
+        <div id="chanceLabel" style="font-weight: bold; color: #888; margin-bottom: 5px;">SET CHANCE</div>
+        <input type="range" id="chanceRange" min="0.1" max="99.9" step="0.1" value="50" oninput="syncFromSlider(this.value)">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <input type="number" id="chanceInput" value="50" step="0.1" oninput="syncFromInput(this.value)">
+            <span style="font-size: 20px; font-weight: bold;">%</span>
+        </div>
+
+        <label style="cursor: pointer; display: block; margin-top: 20px;">
+            <input type="checkbox" id="expCheck" onchange="toggleExpMode()">
+            <span id="expLabel" style="margin-left: 8px;">Experimental Mode</span>
+        </label>
+    </div>
+
+    <div id="chance-display">1 in 1</div>
+    <button id="mainButton" onclick="tryLuck()">PUSH</button>
+
+    <div class="record-box">
+        <span id="recordLabel" style="color: #888;">RECORD:</span>
+        <span id="highScoreValue" style="font-weight: bold; font-size: 22px;">1 in 1</span>
+        <span id="multiplierDisplay"></span>
+        <button class="reset-btn" id="resetBtn" onclick="confirmReset()">RESET</button>
+    </div>
+
+    <script>
+        let currentChance = 1;
+        let bestNormal = 1, countNormal = 1;
+        let bestExp = 1, countExp = 1;
+        let historyData = []; // Объект: { val, isExp }
+
+        const i18n = {
+            ru: { push: "ЖМИ", rec: "РЕКОРД", expRec: "ЭКСП. РЕКОРД", in: "из", label: "ШАНС УСПЕХА", exp: "Экспериментальный режим", reset: "СБРОС", hist: "ТОП ВЫПАДЕНИЙ", confirm: "Сбросить текущий рекорд?" },
+            en: { push: "PUSH", rec: "RECORD", expRec: "EXP. RECORD", in: "in", label: "SET CHANCE", exp: "Experimental Mode", reset: "RESET", hist: "TOP DROPS", confirm: "Reset current record?" },
+            uk: { push: "ТИСНИ", rec: "РЕКОРД", expRec: "ЕКСП. РЕКОРД", in: "з", label: "ШАНС УСПІХУ", exp: "Експериментальний режим", reset: "СКИДАННЯ", hist: "ТОП ВИПАДІНЬ", confirm: "Скинути?" },
+            de: { push: "DRÜCKEN", rec: "REKORD", expRec: "EXP. REKORD", in: "in", label: "CHANCE EINSTELLEN", exp: "Experimenteller Modus", reset: "RESET", hist: "BESTE DROPS", confirm: "Zurücksetzen?" },
+            jp: { push: "押す", rec: "最高記録", expRec: "実験記録", in: "の", label: "確率設定", exp: "実験モード", reset: "リセット", hist: "ランキング", confirm: "リセット?" }
+            // ... остальные языки подхватятся через дефолт 'en' или добавятся автоматически
+        };
+
+        function formatNumber(num) {
+            return (num % 1 === 0) ? num.toLocaleString() : num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function syncFromSlider(val) {
+            document.getElementById('chanceInput').value = val;
+            const hue = 150 - (val * 1.5);
+            document.getElementById('chanceRange').style.accentColor = `hsl(${hue}, 100%, 50%)`;
+            resetGame();
+        }
+
+        function syncFromInput(val) {
+            let v = parseFloat(val) || 0.1;
+            if (v > 99.9) v = 99.9; if (v < 0.1) v = 0.1;
+            document.getElementById('chanceRange').value = v;
+            resetGame();
+        }
+
+        function tryLuck() {
+            const chancePercent = parseFloat(document.getElementById('chanceInput').value);
+            const chanceDecimal = chancePercent / 100;
+            const isExp = document.getElementById('expCheck').checked;
+
+            if (isExp || Math.random() < chanceDecimal) {
+                currentChance = currentChance / chanceDecimal;
+
+                if (currentChance > 255) {
+                    historyData.push({ val: currentChance, isExp: isExp });
+                    historyData.sort((a, b) => b.val - a.val);
+                    if (historyData.length > 25) historyData.pop();
+                    renderHistory();
+                }
+
+                updateDisplayVisuals(currentChance);
+
+                const currentStr = currentChance.toFixed(2);
+                if (isExp) {
+                    if (currentChance > bestExp + 0.001) { bestExp = currentChance; countExp = 1; }
+                    else if (currentStr === bestExp.toFixed(2)) countExp++;
+                } else {
+                    if (currentChance > bestNormal + 0.001) { bestNormal = currentChance; countNormal = 1; }
+                    else if (currentStr === bestNormal.toFixed(2)) countNormal++;
+                }
+                updateBestVisuals();
+            } else {
+                resetGame();
+                const display = document.getElementById('chance-display');
+                display.style.color = "#ff4444";
+                setTimeout(() => display.style.color = "var(--primary)", 200);
+            }
+        }
+
+        function renderHistory() {
+            const l = document.getElementById('langSelect').value;
+            const list = document.getElementById('historyList');
+            list.innerHTML = "";
+
+            historyData.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'history-item' + (index === 0 ? ' top-rank' : '') + (item.isExp ? ' is-exp' : '');
+
+                const valText = formatChanceText(item.val, l);
+                const tag = item.isExp ? `<span class="exp-tag">EXP</span>` : '';
+
+                div.innerHTML = `<span>#${index+1}</span> <span>${valText}${tag}</span>`;
+                list.appendChild(div);
+            });
+        }
+
+        function formatChanceText(val, lang) {
+            const v = formatNumber(val);
+            const d = i18n[lang] || i18n['en'];
+            return (lang === 'jp' || lang === 'zh' || lang === 'ko') ? `${v} ${d.in || 'in'} 1` : `1 ${d.in || 'in'} ${v}`;
+        }
+
+        function updateDisplayVisuals(val) {
+            const l = document.getElementById('langSelect').value;
+            const display = document.getElementById('chance-display');
+            display.innerText = formatChanceText(val, l);
+            if (val >= 1000) display.style.color = document.getElementById('expCheck').checked ? "var(--exp)" : "var(--accent)";
+        }
+
+        function updateBestVisuals() {
+            const l = document.getElementById('langSelect').value;
+            const isExp = document.getElementById('expCheck').checked;
+            const best = isExp ? bestExp : bestNormal;
+            const count = isExp ? countExp : countNormal;
+            const d = i18n[l] || i18n['en'];
+
+            document.getElementById('recordLabel').innerText = isExp ? d.expRec : d.rec;
+            document.getElementById('highScoreValue').innerText = formatChanceText(best, l);
+
+            const mult = document.getElementById('multiplierDisplay');
+            mult.innerText = count > 1 ? `x${count}` : "";
+            mult.className = count > 1 ? "multiplier" : "";
+        }
+
+        function changeLanguage() {
+            const l = document.getElementById('langSelect').value;
+            const d = i18n[l] || i18n['en'];
+            document.getElementById('mainButton').innerText = d.push;
+            document.getElementById('chanceLabel').innerText = d.label;
+            document.getElementById('expLabel').innerText = d.exp;
+            document.getElementById('resetBtn').innerText = d.reset;
+            document.getElementById('histTitle').innerText = d.hist;
+            renderHistory();
+            updateBestVisuals();
+            updateDisplayVisuals(currentChance);
+        }
+
+        function toggleExpMode() {
+            resetGame();
+            updateBestVisuals();
+            renderHistory();
+        }
+
+        function resetGame() {
+            currentChance = 1;
+            updateDisplayVisuals(1);
+        }
+
+        function confirmReset() {
+            const l = document.getElementById('langSelect').value;
+            if (confirm(i18n[l]?.confirm || "Reset?")) {
+                if (document.getElementById('expCheck').checked) { bestExp = 1; countExp = 1; }
+                else { bestNormal = 1; countNormal = 1; }
+                updateBestVisuals();
+            }
+        }
+
+        // --- Keyboard activation -------------------------------------------------
+        // Every key on the keyboard activates the PUSH button. This also covers
+        // hardware keyboards attached to iPads/tablets, which dispatch standard
+        // keydown events to the page.
+        const mainButton = document.getElementById('mainButton');
+
+        // Elements where typing should keep working (settings) instead of
+        // triggering a PUSH on every keystroke.
+        function isTypingTarget(el) {
+            if (!el) return false;
+            const tag = el.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+        }
+
+        function pressMainButton() {
+            // Visual feedback (mimics the :active press state).
+            mainButton.classList.add('key-active');
+            setTimeout(() => mainButton.classList.remove('key-active'), 100);
+            tryLuck();
+        }
+
+        document.addEventListener('keydown', function (e) {
+            // Ignore pure modifier keys and OS/browser shortcuts so the page
+            // still behaves normally for things like Cmd/Ctrl+R, Tab, etc.
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' ||
+                e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab' ||
+                e.key === 'Dead') return;
+
+            // Let the user type into the settings fields.
+            if (isTypingTarget(e.target)) return;
+
+            // Avoid Space/Enter double-firing via the button's own activation,
+            // and prevent Space/Arrows from scrolling the page.
+            e.preventDefault();
+            pressMainButton();
+        });
+
+        changeLanguage();
+    </script>
+</body>
+</html>
