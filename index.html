@@ -257,6 +257,12 @@
         .hex-center.ready { animation: hexGlow 1s ease-in-out infinite; }
         .hex-center.cant { background: #3a4a5e; cursor: not-allowed; box-shadow: inset 0 0 0 3px #54657a; }
         @keyframes hexGlow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.45); } }
+
+        #versionTag {
+            position: fixed; bottom: 8px; right: 12px; z-index: 400;
+            font-family: 'Courier New', monospace; font-size: 12px; font-weight: 700;
+            color: rgba(255,255,255,0.35); user-select: none; pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -357,6 +363,8 @@
         <div class="rebirth-sub">Tap the center to rebirth: spend all coins for <b>+1 RP</b>. Next costs <span id="rebirthCostTxt">—</span> coins (each rebirth is 2× the last). Spend RP on the perks around it — they are permanent.</div>
         <div id="hexGrid" class="hex-grid"></div>
     </div>
+
+    <div id="versionTag">v1.001</div>
 
     <div id="offlineModal" class="modal-overlay" style="display:none;">
         <div class="modal-card">
@@ -507,12 +515,26 @@
         let perksOwned = {};            // { perkId: true }
         // Permanent perks bought with RP. Each multiplies a stat.
         const PERKS = [
-            { id: 'coin1',  name: 'Riches',   icon: '💰', cost: 1, coin: 5 },
-            { id: 'luck1',  name: 'Fortune',  icon: '🍀', cost: 1, luck: 5 },
-            { id: 'click1', name: 'Frenzy',   icon: '⚡', cost: 2, click: 3 },
+            // ring 1 (inner, cheaper)
+            { id: 'coin1',  name: 'Riches',    icon: '💰', cost: 1, coin: 5 },
+            { id: 'luck1',  name: 'Fortune',   icon: '🍀', cost: 1, luck: 5 },
+            { id: 'click1', name: 'Frenzy',    icon: '⚡', cost: 2, click: 3 },
             { id: 'off1',   name: 'Idle Lord', icon: '😴', cost: 2, off: 5 },
-            { id: 'coin2',  name: 'Midas',    icon: '👑', cost: 3, coin: 25 },
-            { id: 'all1',   name: 'Ascended', icon: '🌟', cost: 5, coin: 10, luck: 10 }
+            { id: 'coin2',  name: 'Midas',     icon: '👑', cost: 3, coin: 25 },
+            { id: 'all1',   name: 'Ascended',  icon: '🌟', cost: 5, coin: 10, luck: 10 },
+            // ring 2 (outer, pricier, stronger)
+            { id: 'coin3',  name: 'Tycoon',    icon: '💵', cost: 8,  coin: 100 },
+            { id: 'luck2',  name: 'Jackpot',   icon: '🎰', cost: 8,  luck: 25 },
+            { id: 'click2', name: 'Inferno',   icon: '🔥', cost: 10, click: 5 },
+            { id: 'off2',   name: 'Dreamer',   icon: '🌙', cost: 10, off: 10 },
+            { id: 'coin4',  name: 'Banker',    icon: '🏦', cost: 14, coin: 1000 },
+            { id: 'luck3',  name: 'Oracle',    icon: '🔮', cost: 14, luck: 100 },
+            { id: 'click3', name: 'Storm',     icon: '🌩️', cost: 20, click: 10 },
+            { id: 'off3',   name: 'Hibernate', icon: '🛌', cost: 20, off: 50 },
+            { id: 'coin5',  name: 'Diamond',   icon: '💎', cost: 30, coin: 1e6 },
+            { id: 'luck4',  name: 'Stardust',  icon: '🌌', cost: 40, luck: 1000 },
+            { id: 'all2',   name: 'Overlord',  icon: '😈', cost: 60, coin: 100, luck: 50, click: 3 },
+            { id: 'all3',   name: 'Godhood',   icon: '☀️', cost: 100, coin: 1e6, luck: 1e4, click: 10, off: 100 }
         ];
         function perkMult(kind) { let m = 1; for (const p of PERKS) if (perksOwned[p.id] && p[kind]) m *= p[kind]; return m; }
 
@@ -771,18 +793,21 @@
             place(0, 0, 'hex-center ' + (canRb ? 'ready' : 'cant'),
                 `<div class="hex-ic">✦</div><div class="hex-tt">REBIRTH</div><div class="hex-sub">${formatBig(cost, true)}</div>`,
                 doRebirth);
-            // ring 1 = the perks
-            const ring1 = hexRing(1);
+            // perks fill ring 1 (inner, cheaper) then ring 2 (outer, pricier)
+            const perkCells = [...hexRing(1), ...hexRing(2)];
             PERKS.forEach((p, i) => {
-                const [q, r] = ring1[i];
+                const [q, r] = perkCells[i];
                 const owned = !!perksOwned[p.id];
                 const cls = 'hex-perk ' + (owned ? 'owned' : (rebirthPoints >= p.cost ? 'ready' : 'locked'));
                 place(q, r, cls,
                     `<div class="hex-ic">${p.icon}</div><div class="hex-tt">${p.name}</div><div class="hex-sub">${owned ? 'OWNED' : '★ ' + p.cost}</div>`,
                     () => buyPerk(p.id));
             });
-            // ring 2 = decorative locked "?"
-            hexRing(2).forEach(([q, r]) => place(q, r, 'hex-locked', `<div class="hex-q">?</div>`));
+            // any cells past the perk list stay locked "?"
+            for (let i = PERKS.length; i < perkCells.length; i++) {
+                const [q, r] = perkCells[i];
+                place(q, r, 'hex-locked', `<div class="hex-q">?</div>`);
+            }
         }
 
         // Buy the most levels possible across all upgrades, balanced by marginal
@@ -1067,6 +1092,10 @@
             e.preventDefault();
             pressMainButton();
         });
+
+        // Bump this on every release (shown in the bottom-right corner).
+        const VERSION = '1.001';
+        document.getElementById('versionTag').innerText = 'v' + VERSION;
 
         loadState();
         changeLanguage();
