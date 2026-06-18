@@ -205,6 +205,58 @@
         }
         #offlineOk:hover { filter: brightness(1.08); }
         #offlineOk:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8911f; }
+
+        /* Rebirth open button */
+        #rebirthOpenBtn {
+            margin-top: 16px; padding: 12px 30px; cursor: pointer;
+            background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff;
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 14px;
+            font-weight: 900; font-size: 15px; letter-spacing: 1px;
+            box-shadow: 0 5px 0 #3b3185; transition: all 0.12s;
+        }
+        #rebirthOpenBtn:hover { filter: brightness(1.1); }
+        #rebirthOpenBtn:active { transform: translateY(3px); box-shadow: 0 2px 0 #3b3185; }
+        #rebirthOpenBtn.ready { animation: rbPulse 1s ease-in-out infinite; }
+        @keyframes rbPulse { 0%,100% { box-shadow: 0 5px 0 #3b3185, 0 0 0 rgba(124,58,237,0); } 50% { box-shadow: 0 5px 0 #3b3185, 0 0 26px rgba(124,58,237,0.85); } }
+
+        /* Rebirth overlay (hex tree) */
+        .rebirth-overlay {
+            position: fixed; inset: 0; z-index: 300;
+            background: radial-gradient(ellipse at center, #17283d 0%, #0b1626 68%, #060d17 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: auto;
+        }
+        .rebirth-title { font-size: 30px; font-weight: 900; color: #fff; margin: 12px 0 4px; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+        .rebirth-title span { color: #b794f6; }
+        .rebirth-sub { color: #9fb3c8; font-size: 13.5px; margin-bottom: 18px; text-align: center; padding: 0 24px; max-width: 560px; word-break: break-word; }
+        .rebirth-close {
+            position: absolute; top: 20px; right: 24px; width: 46px; height: 46px; border-radius: 12px;
+            background: #e23b3b; color: #fff; border: none; font-size: 22px; font-weight: 900; cursor: pointer;
+        }
+        .rebirth-close:hover { filter: brightness(1.1); }
+
+        .hex-grid { position: relative; width: 540px; height: 520px; flex-shrink: 0; }
+        .hex {
+            position: absolute; width: 84px; height: 74px; transform: translate(-50%, -50%);
+            clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: #243446; color: #e8eef5; transition: background 0.15s, box-shadow 0.15s;
+            box-sizing: border-box; text-align: center; padding: 4px; overflow: hidden;
+        }
+        .hex .hex-ic  { font-size: 22px; line-height: 1; }
+        .hex .hex-tt  { font-size: 9.5px; font-weight: 800; margin-top: 2px; line-height: 1.1; }
+        .hex .hex-sub { font-size: 9px; font-weight: 800; margin-top: 1px; }
+        .hex .hex-q   { font-size: 30px; font-weight: 900; color: #54657a; }
+        .hex-locked { background: #1b2735; }
+        .hex-perk { cursor: pointer; }
+        .hex-perk.ready { background: #2f8f2f; box-shadow: inset 0 0 0 3px #5bc236; }
+        .hex-perk.ready:hover { background: #38a838; }
+        .hex-perk.owned { background: #5bc236; color: #07270c; box-shadow: inset 0 0 0 3px #8de65a; }
+        .hex-perk.locked { background: #20303f; color: #6b7c90; cursor: not-allowed; }
+        .hex-perk.locked .hex-sub { color: #e2a33b; }
+        .hex-center { background: #2b6fe2; cursor: pointer; box-shadow: inset 0 0 0 3px #6ea8ff; }
+        .hex-center.ready { animation: hexGlow 1s ease-in-out infinite; }
+        .hex-center.cant { background: #3a4a5e; cursor: not-allowed; box-shadow: inset 0 0 0 3px #54657a; }
+        @keyframes hexGlow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.45); } }
     </style>
 </head>
 <body>
@@ -295,6 +347,15 @@
         <span id="highScoreValue" style="font-weight: bold; font-size: 22px;">1 in 1</span>
         <span id="multiplierDisplay"></span>
         <button class="reset-btn" id="resetBtn" onclick="confirmReset()">RESET</button>
+    </div>
+
+    <button id="rebirthOpenBtn" onclick="openRebirth()">✦ REBIRTH · <span id="rpMain">0</span> RP</button>
+
+    <div id="rebirthOverlay" class="rebirth-overlay" style="display:none;">
+        <button class="rebirth-close" onclick="closeRebirth()">✕</button>
+        <h2 class="rebirth-title">REBIRTH · <span id="rpValue">0</span> RP</h2>
+        <div class="rebirth-sub">Tap the center to rebirth: spend all coins for <b>+1 RP</b>. Next costs <span id="rebirthCostTxt">—</span> coins (each rebirth is 2× the last). Spend RP on the perks around it — they are permanent.</div>
+        <div id="hexGrid" class="hex-grid"></div>
     </div>
 
     <div id="offlineModal" class="modal-overlay" style="display:none;">
@@ -441,6 +502,20 @@
         let pendingOffline = null;      // offline coins awaiting CLAIM
         const OFFLINE_CAP = 500000;     // max attempts simulated for offline progress
 
+        // ----- Rebirth / prestige -----
+        let rebirthPoints = 0;          // spendable RP (earned by rebirthing)
+        let perksOwned = {};            // { perkId: true }
+        // Permanent perks bought with RP. Each multiplies a stat.
+        const PERKS = [
+            { id: 'coin1',  name: 'Riches',   icon: '💰', cost: 1, coin: 5 },
+            { id: 'luck1',  name: 'Fortune',  icon: '🍀', cost: 1, luck: 5 },
+            { id: 'click1', name: 'Frenzy',   icon: '⚡', cost: 2, click: 3 },
+            { id: 'off1',   name: 'Idle Lord', icon: '😴', cost: 2, off: 5 },
+            { id: 'coin2',  name: 'Midas',    icon: '👑', cost: 3, coin: 25 },
+            { id: 'all1',   name: 'Ascended', icon: '🌟', cost: 5, coin: 10, luck: 10 }
+        ];
+        function perkMult(kind) { let m = 1; for (const p of PERKS) if (perksOwned[p.id] && p[kind]) m *= p[kind]; return m; }
+
         const SAVE_KEY = 'luckyGrowSave';
 
         function toBN(x) {
@@ -453,7 +528,7 @@
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify({
                     bestNormal, countNormal, coins, luckLevel, coinLevel, clickLevel,
-                    scientific, autoOwned, autoOn, historyData,
+                    scientific, autoOwned, autoOn, rebirthPoints, perksOwned, historyData,
                     chance: parseFloat(document.getElementById('chanceInput').value) || 0.1,
                     ts: Date.now(),
                     lang: document.getElementById('langSelect').value
@@ -484,6 +559,8 @@
                 scientific = !!s.scientific;
                 autoOwned = !!s.autoOwned;
                 autoOn = !!s.autoOn;
+                rebirthPoints = s.rebirthPoints ?? 0;
+                perksOwned = (s.perksOwned && typeof s.perksOwned === 'object') ? s.perksOwned : {};
                 loadedTs = s.ts ?? null;
                 if (s.chance != null && isFinite(s.chance)) {
                     document.getElementById('chanceInput').value = s.chance;
@@ -515,9 +592,9 @@
 
         // ===== Upgrades ======================================================
         const MAX_CLICKS = 10000;                            // cap so one push never lags
-        function luckMult() { return 1 + luckLevel; }       // failure chance ÷ this
-        function coinMult() { return 1 + coinLevel; }       // coins × this
-        function clicksPerPush() { return Math.min(1 + clickLevel, MAX_CLICKS); } // attempts/push
+        function luckMult() { return (1 + luckLevel) * perkMult('luck'); }   // failure chance ÷ this
+        function coinMult() { return (1 + coinLevel) * perkMult('coin'); }   // coins × this
+        function clicksPerPush() { return Math.min(Math.floor((1 + clickLevel) * perkMult('click')), MAX_CLICKS); } // attempts/push
 
         // Each upgrade follows cost(level) = base × growth^level. `cap` is the
         // highest purchasable level index (MULTI-CLICK is capped; others aren't).
@@ -591,7 +668,7 @@
         // chance and all upgrades (luck, coin bonus, multi-click), so the reward
         // scales with their progress. Owning the auto clicker raises the offline
         // rate from 1 to 10 clicks/sec. Capped so it never lags on return.
-        function offlineClicksPerSec() { return autoOwned ? 10 : 1; }
+        function offlineClicksPerSec() { return (autoOwned ? 10 : 1) * perkMult('off'); }
         function simulateOffline(seconds) {
             const p = (parseFloat(document.getElementById('chanceInput').value) || 0.1) / 100;
             const invP = 1 / p;
@@ -629,7 +706,83 @@
         function claimOffline() {
             if (pendingOffline) { coins = bnAdd(coins, pendingOffline); pendingOffline = null; }
             document.getElementById('offlineModal').style.display = 'none';
-            updateCoins(); updateShop(); saveState();
+            updateCoins(); updateShop(); updateRebirthBtn(); saveState();
+        }
+
+        // ----- Rebirth: spend all coins for +1 RP; each costs 2× the last -------
+        // cost to earn the next point = 2^rebirthPoints × 10^1e6 coins.
+        function rebirthCost() {
+            const logV = rebirthPoints * Math.log10(2) + 1000000;
+            const e = Math.floor(logV);
+            return bnNorm(Math.pow(10, logV - e), e);
+        }
+        function doRebirth() {
+            if (bnCompare(coins, rebirthCost()) < 0) return;
+            coins = bn(0, 0);          // spend everything
+            currentChance = bn(1, 0);  // reset the active streak
+            rebirthPoints += 1;
+            updateCoins(); updateShop(); updateDisplayVisuals(currentChance);
+            renderRebirth(); saveState();
+        }
+        function buyPerk(id) {
+            const p = PERKS.find(x => x.id === id);
+            if (!p || perksOwned[id] || rebirthPoints < p.cost) return;
+            rebirthPoints -= p.cost;
+            perksOwned[id] = true;
+            updateShop(); updateCoins(); updateDisplayVisuals(currentChance);
+            renderRebirth(); saveState();
+        }
+        function updateRebirthBtn() {
+            document.getElementById('rpMain').innerText = rebirthPoints;
+            document.getElementById('rebirthOpenBtn').classList.toggle('ready', bnCompare(coins, rebirthCost()) >= 0);
+        }
+
+        // Hexagonal honeycomb (flower: centre + ring of 6 perks + outer ring of "?").
+        const AX_DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+        function hexRing(radius) {
+            if (radius === 0) return [[0, 0]];
+            const cells = [];
+            let q = AX_DIRS[4][0] * radius, r = AX_DIRS[4][1] * radius;
+            for (let i = 0; i < 6; i++) for (let j = 0; j < radius; j++) { cells.push([q, r]); q += AX_DIRS[i][0]; r += AX_DIRS[i][1]; }
+            return cells;
+        }
+        function openRebirth() { renderRebirth(); document.getElementById('rebirthOverlay').style.display = 'flex'; }
+        function closeRebirth() { document.getElementById('rebirthOverlay').style.display = 'none'; }
+        function renderRebirth() {
+            updateRebirthBtn();
+            document.getElementById('rpValue').innerText = rebirthPoints;
+            const cost = rebirthCost();
+            document.getElementById('rebirthCostTxt').innerText = formatBig(cost, true); // always e+ (always huge)
+            const grid = document.getElementById('hexGrid');
+            grid.innerHTML = '';
+            const SIZE = 48, CX = 270, CY = 260;
+            const place = (q, r, cls, html, onclick) => {
+                const x = SIZE * 1.5 * q, y = SIZE * Math.sqrt(3) * (r + q / 2);
+                const el = document.createElement('div');
+                el.className = 'hex ' + cls;
+                el.style.left = (CX + x) + 'px';
+                el.style.top = (CY + y) + 'px';
+                el.innerHTML = html;
+                if (onclick) el.onclick = onclick;
+                grid.appendChild(el);
+            };
+            // centre = rebirth action
+            const canRb = bnCompare(coins, cost) >= 0;
+            place(0, 0, 'hex-center ' + (canRb ? 'ready' : 'cant'),
+                `<div class="hex-ic">✦</div><div class="hex-tt">REBIRTH</div><div class="hex-sub">${formatBig(cost, true)}</div>`,
+                doRebirth);
+            // ring 1 = the perks
+            const ring1 = hexRing(1);
+            PERKS.forEach((p, i) => {
+                const [q, r] = ring1[i];
+                const owned = !!perksOwned[p.id];
+                const cls = 'hex-perk ' + (owned ? 'owned' : (rebirthPoints >= p.cost ? 'ready' : 'locked'));
+                place(q, r, cls,
+                    `<div class="hex-ic">${p.icon}</div><div class="hex-tt">${p.name}</div><div class="hex-sub">${owned ? 'OWNED' : '★ ' + p.cost}</div>`,
+                    () => buyPerk(p.id));
+            });
+            // ring 2 = decorative locked "?"
+            hexRing(2).forEach(([q, r]) => place(q, r, 'hex-locked', `<div class="hex-q">?</div>`));
         }
 
         // Buy the most levels possible across all upgrades, balanced by marginal
@@ -779,6 +932,7 @@
 
         function updateCoins() {
             document.getElementById('coinsValue').innerText = formatBig(coins, scientific);
+            updateRebirthBtn();
         }
 
         function updateShop() {
