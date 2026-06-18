@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Elite RNG Simulator - Global Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IdLe RNG</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #00ffcc;
             --accent: #ffcc00;
-            --exp: #ff00ff;
+            --coin: #ffd24a;
             --bg: #050505;
             --panel: rgba(20, 20, 20, 0.8);
         }
@@ -16,8 +20,9 @@
             background-color: var(--bg);
             color: white;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            height: 100vh; margin: 0; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            height: 100vh; margin: 0; padding: 24px 0; box-sizing: border-box;
+            overflow-x: hidden; overflow-y: auto;
         }
 
         /* Панель истории */
@@ -44,13 +49,64 @@
             transition: all 0.3s ease;
         }
 
-        .history-item.is-exp { border-left-color: var(--exp); }
         .history-item.top-rank {
             border-left-color: var(--accent); background: rgba(255, 204, 0, 0.1);
             transform: scale(1.02); box-shadow: 0 0 15px rgba(255, 204, 0, 0.1);
         }
 
-        .exp-tag { font-size: 10px; color: var(--exp); border: 1px solid var(--exp); padding: 1px 4px; border-radius: 4px; margin-left: 5px; }
+        /* Магазин */
+        .shop-panel {
+            position: absolute; right: 20px; top: 40px; bottom: 40px; width: 280px;
+            background: var(--panel); backdrop-filter: blur(15px); border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px;
+            display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .shop-title {
+            font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+            margin-bottom: 12px; color: var(--accent); text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;
+        }
+
+        .coins-line {
+            text-align: center; font-weight: 900; font-size: 20px; color: var(--coin);
+            margin-bottom: 18px; word-break: break-word;
+            text-shadow: 0 0 15px rgba(255, 210, 74, 0.3);
+        }
+        .coins-line .coin-icon { margin-right: 6px; }
+
+        .upgrade {
+            background: rgba(255,255,255,0.05); margin-bottom: 12px; padding: 14px;
+            border-radius: 14px; border: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer; transition: all 0.15s ease;
+        }
+        .upgrade:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+        .upgrade:active { transform: translateY(1px); }
+        .upgrade.locked { opacity: 0.45; cursor: not-allowed; }
+        .upgrade.locked:hover { transform: none; background: rgba(255,255,255,0.05); }
+
+        .up-name { font-weight: 800; letter-spacing: .5px; display: flex; justify-content: space-between; }
+        .up-name .lvl { color: var(--primary); }
+        .up-desc { font-size: 12px; color: #aaa; margin: 6px 0; }
+        .up-cost {
+            font-family: 'Courier New', monospace; font-weight: bold; font-size: 14px;
+            color: var(--coin); display: flex; justify-content: space-between; align-items: center;
+            border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;
+        }
+        .up-cost .buy-tag {
+            font-size: 11px; color: #000; background: var(--coin);
+            padding: 2px 8px; border-radius: 6px; font-family: 'Segoe UI', sans-serif;
+        }
+
+        #buyMaxBtn {
+            margin-top: 4px; padding: 12px; cursor: pointer; width: 100%;
+            background: var(--coin); color: #000; border: none; border-radius: 14px;
+            font-weight: 900; font-size: 15px; letter-spacing: .5px;
+            box-shadow: 0 4px 0 #b8911f; transition: all 0.1s;
+        }
+        #buyMaxBtn:hover { filter: brightness(1.08); }
+        #buyMaxBtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b8911f; }
+        #buyMaxBtn.locked { opacity: 0.45; cursor: not-allowed; box-shadow: 0 4px 0 #b8911f; transform: none; }
 
         /* Настройки */
         .settings-card {
@@ -71,10 +127,27 @@
             padding: 8px; border-radius: 8px; width: 90px; text-align: center; font-size: 18px;
         }
 
+        #sciBtn, #autoBtn {
+            margin-top: 20px; padding: 10px 18px; cursor: pointer;
+            background: rgba(255,255,255,0.06); color: #ddd;
+            border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+            font-size: 13px; font-weight: 700; transition: all 0.15s;
+        }
+        #autoBtn { margin-left: 8px; }
+        #sciBtn:hover, #autoBtn:hover { background: rgba(255,255,255,0.12); }
+        #sciBtn.on { background: var(--primary); color: #000; border-color: var(--primary); }
+        #autoBtn.on { background: var(--accent); color: #000; border-color: var(--accent); }
+        #autoBtn.disabled { opacity: 0.4; cursor: not-allowed; }
+        #autoBtn.disabled:hover { background: rgba(255,255,255,0.06); }
+
+        @keyframes autoPulse { 0%,100% { box-shadow: 0 10px 0 #ddd, 0 0 0 rgba(255,204,0,0); } 50% { box-shadow: 0 10px 0 #ddd, 0 0 28px rgba(255,204,0,0.7); } }
+        button#mainButton.auto-running { animation: autoPulse 0.8s ease-in-out infinite; }
+
         /* Дисплей */
         #chance-display {
             font-size: 64px; font-weight: 900; margin: 20px 0; color: var(--primary);
             text-shadow: 0 0 30px rgba(0, 255, 204, 0.4); transition: transform 0.2s;
+            text-align: center; padding: 0 20px; word-break: break-word;
         }
 
         button#mainButton {
@@ -94,11 +167,49 @@
         .multiplier { background: var(--accent); color: black; padding: 2px 10px; border-radius: 6px; font-weight: 900; }
 
         .reset-btn { background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.2); padding: 6px 15px; border-radius: 8px; cursor: pointer; }
+
+        /* Hand-drawn marker title */
+        .game-title {
+            font-family: 'Permanent Marker', cursive;
+            font-size: clamp(42px, 7vw, 88px); font-weight: 400; margin: 0 0 18px; line-height: 1;
+            user-select: none; white-space: nowrap;
+        }
+        .game-title span { display: inline-block; }
+        .game-title .t-i  { color: #f2d600; transform: rotate(-6deg); }
+        .game-title .t-d  { color: #f2d600; transform: rotate(4deg); }
+        .game-title .t-l  { color: #f2d600; transform: rotate(-3deg); }
+        .game-title .t-e  { color: #f2d600; transform: rotate(7deg); }
+        .game-title .t-sp { width: 28px; }
+        .game-title .t-r  { color: #e23b3b; transform: rotate(-7deg) scale(1.15); text-shadow: 0 0 18px rgba(226,59,59,0.4); }
+        .game-title .t-n  { color: #3b6ee2; transform: rotate(5deg)  scale(1.15); text-shadow: 0 0 18px rgba(59,110,226,0.4); }
+        .game-title .t-g  { color: #3bc24a; transform: rotate(-4deg) scale(1.15); text-shadow: 0 0 18px rgba(59,194,74,0.4); }
+
+        /* Offline-earnings modal */
+        .modal-overlay {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.72); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-card {
+            background: var(--panel); border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 24px; padding: 36px 42px; max-width: 460px; text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+        }
+        .modal-card h2 { margin: 0 0 14px; color: var(--accent); font-size: 22px; letter-spacing: 1px; }
+        .modal-text { font-size: 18px; line-height: 1.55; margin-bottom: 26px; color: #eee; word-break: break-word; }
+        .modal-text .coins-amt { color: var(--coin); font-weight: 900; }
+        #offlineOk {
+            padding: 14px 54px; font-size: 18px; font-weight: 900; cursor: pointer;
+            background: var(--coin); color: #000; border: none; border-radius: 14px;
+            box-shadow: 0 5px 0 #b8911f; transition: all 0.1s;
+        }
+        #offlineOk:hover { filter: brightness(1.08); }
+        #offlineOk:active { transform: translateY(3px); box-shadow: 0 2px 0 #b8911f; }
     </style>
 </head>
 <body>
 
-    <div style="position: absolute; top: 20px; right: 20px;">
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 10;">
         <select id="langSelect" onchange="changeLanguage()" style="background: var(--panel); color: white; border: 1px solid #444; padding: 10px; border-radius: 12px; cursor: pointer;">
             <option value="en" selected>English 🇺🇸</option>
             <option value="ru">Русский 🇷🇺</option>
@@ -131,6 +242,39 @@
         <div id="historyList"></div>
     </div>
 
+    <div class="shop-panel">
+        <div class="shop-title" id="shopTitle">SHOP</div>
+        <div class="coins-line"><span class="coin-icon">🪙</span><span id="coinsValue">0</span></div>
+
+        <div class="upgrade" id="luckUpgrade" onclick="buyLuck()">
+            <div class="up-name"><span id="luckName">LUCK</span><span class="lvl">Lv <span id="luckLevel">0</span></span></div>
+            <div class="up-desc"><span id="luckDesc">Fewer failures</span> · <span id="luckEffect"></span></div>
+            <div class="up-cost"><span class="buy-tag" id="luckBuy">BUY</span> <span><span class="coin-icon">🪙</span> <span id="luckCost">0</span></span></div>
+        </div>
+
+        <div class="upgrade" id="coinUpgrade" onclick="buyCoin()">
+            <div class="up-name"><span id="coinName">COIN BONUS</span><span class="lvl">Lv <span id="coinLevelTxt">0</span></span></div>
+            <div class="up-desc"><span id="coinDesc">More coins per win</span> · <span id="coinEffect"></span></div>
+            <div class="up-cost"><span class="buy-tag" id="coinBuy">BUY</span> <span><span class="coin-icon">🪙</span> <span id="coinCost">0</span></span></div>
+        </div>
+
+        <div class="upgrade" id="clickUpgrade" onclick="buyClick()">
+            <div class="up-name"><span id="clickName">MULTI-CLICK</span><span class="lvl">Lv <span id="clickLevelTxt">0</span></span></div>
+            <div class="up-desc"><span id="clickDesc">Each push counts more</span> · <span id="clickEffect"></span></div>
+            <div class="up-cost"><span class="buy-tag" id="clickBuy">BUY</span> <span><span class="coin-icon">🪙</span> <span id="clickCost">0</span></span></div>
+        </div>
+
+        <div class="upgrade" id="autoUpgrade" onclick="buyAuto()">
+            <div class="up-name"><span id="autoName">AUTO CLICKER</span><span class="lvl" id="autoLvl"></span></div>
+            <div class="up-desc"><span id="autoDesc">Auto-clicks 25/sec</span></div>
+            <div class="up-cost"><span class="buy-tag" id="autoBuy">BUY</span> <span><span class="coin-icon" id="autoCoinIcon">🪙</span> <span id="autoCostTxt">0</span></span></div>
+        </div>
+
+        <button id="buyMaxBtn" onclick="buyMaxAll()">BUY MAX</button>
+    </div>
+
+    <h1 class="game-title" aria-label="IdLe RNG"><span class="t-i">I</span><span class="t-d">d</span><span class="t-l">L</span><span class="t-e">e</span><span class="t-sp"> </span><span class="t-r">R</span><span class="t-n">N</span><span class="t-g">G</span></h1>
+
     <div class="settings-card">
         <div id="chanceLabel" style="font-weight: bold; color: #888; margin-bottom: 5px;">SET CHANCE</div>
         <input type="range" id="chanceRange" min="0.1" max="99.9" step="0.1" value="50" oninput="syncFromSlider(this.value)">
@@ -139,10 +283,8 @@
             <span style="font-size: 20px; font-weight: bold;">%</span>
         </div>
 
-        <label style="cursor: pointer; display: block; margin-top: 20px;">
-            <input type="checkbox" id="expCheck" onchange="toggleExpMode()">
-            <span id="expLabel" style="margin-left: 8px;">Experimental Mode</span>
-        </label>
+        <button id="sciBtn" onclick="toggleScientific()">Scientific Numbers: OFF</button>
+        <button id="autoBtn" onclick="toggleAuto()">Auto Clicker: OFF</button>
     </div>
 
     <div id="chance-display">1 in 1</div>
@@ -155,21 +297,177 @@
         <button class="reset-btn" id="resetBtn" onclick="confirmReset()">RESET</button>
     </div>
 
+    <div id="offlineModal" class="modal-overlay" style="display:none;">
+        <div class="modal-card">
+            <h2 id="offlineTitle">WELCOME BACK</h2>
+            <div class="modal-text" id="offlineText"></div>
+            <button id="offlineOk" onclick="claimOffline()">CLAIM</button>
+        </div>
+    </div>
+
     <script>
-        let currentChance = 1;
-        let bestNormal = 1, countNormal = 1;
-        let bestExp = 1, countExp = 1;
-        let historyData = []; // Объект: { val, isExp }
+        // ===== Big-number representation =====================================
+        // Values are stored as { m, e } meaning m × 10^e with 1 <= m < 10 (or 0).
+        // This lets rarities and coins grow far beyond JS Number limits, so the
+        // ∞ symbol can never appear.
+        function bnNorm(m, e) {
+            if (!isFinite(m) || m === 0) return { m: 0, e: 0 };
+            let sign = m < 0 ? -1 : 1; m = Math.abs(m);
+            if (m >= 10 || m < 1) {
+                // Jump directly via log10 instead of looping ÷10 (which would
+                // accumulate float error when normalizing very large inputs).
+                const shift = Math.floor(Math.log10(m));
+                m /= Math.pow(10, shift);
+                e += shift;
+            }
+            // Correct any residual float error that left m just outside [1, 10).
+            if (m >= 10) { m /= 10; e++; }
+            else if (m < 1) { m *= 10; e--; }
+            return { m: sign * m, e: e };
+        }
+        function bn(m, e) { return bnNorm(m, e || 0); }
+        function bnFromNumber(x) { return isFinite(x) ? bnNorm(x, 0) : { m: 0, e: 0 }; }
+        function bnMulNum(a, k) { return bnNorm(a.m * k, a.e); }
+        function bnAdd(a, b) {
+            if (a.m === 0) return { m: b.m, e: b.e };
+            if (b.m === 0) return { m: a.m, e: a.e };
+            const hi = Math.max(a.e, b.e);
+            const ma = a.m * Math.pow(10, a.e - hi);
+            const mb = b.m * Math.pow(10, b.e - hi);
+            return bnNorm(ma + mb, hi);
+        }
+        function bnSub(a, b) {
+            if (b.m === 0) return { m: a.m, e: a.e };
+            const hi = Math.max(a.e, b.e);
+            const ma = a.m * Math.pow(10, a.e - hi);
+            const mb = b.m * Math.pow(10, b.e - hi);
+            const r = ma - mb;
+            return r <= 0 ? { m: 0, e: 0 } : bnNorm(r, hi);
+        }
+        function bnCompare(a, b) {
+            if (a.m === 0 && b.m === 0) return 0;
+            if (a.m === 0) return -1;
+            if (b.m === 0) return 1;
+            if (a.e !== b.e) return a.e < b.e ? -1 : 1;
+            if (Math.abs(a.m - b.m) < 1e-12) return 0;
+            return a.m < b.m ? -1 : 1;
+        }
+        function bnKey(a) { return a.e + ':' + a.m.toFixed(6); }
+        function bnFromBaseGrowth(base, growth, level) {
+            const logV = Math.log10(base) + level * Math.log10(growth);
+            const e = Math.floor(logV);
+            return bnNorm(Math.pow(10, logV - e), e);
+        }
+
+        // ===== Large-number suffixes (short scale) ===========================
+        // Compact tiered abbreviations: ones + tens + hundreds for indices 1..999,
+        // then the "millia" (Mi) base-1000 system for higher indices. This names
+        // every illion up to ~10^1e9; past that the display uses scientific form.
+        //   octillion -> "Oc", novemvigintillion -> "NoVt", centillion -> "Ce",
+        //   millillion (10^3003) -> "Mi".
+        const ABBR_SMALL = { 1: 'M', 2: 'B', 3: 'T', 4: 'Qa', 5: 'Qi', 6: 'Sx', 7: 'Sp', 8: 'Oc', 9: 'No' };
+        const ABBR_ONES = { 1: 'U', 2: 'D', 3: 'T', 4: 'Qa', 5: 'Qi', 6: 'Sx', 7: 'Sp', 8: 'Oc', 9: 'No' };
+        const ABBR_TENS = { 10: 'De', 20: 'Vt', 30: 'Tg', 40: 'qg', 50: 'Qg', 60: 'sg', 70: 'Sg', 80: 'Og', 90: 'Ng' };
+        const ABBR_HUNDREDS = { 100: 'Ce', 200: 'Du', 300: 'Tr', 400: 'Qa', 500: 'Qi', 600: 'Se', 700: 'Si', 800: 'Ot', 900: 'Ni' };
+        // Name values up to 10^1e15 (far beyond anything reachable) and scientific
+        // beyond. The ceiling is set by float precision: the illion index must
+        // stay an exact integer (< 2^53) for the base-1000 decomposition to work.
+        const MAX_NAME_EXP = 1e15;
+        // Suffix for a 1..999 group in compound/coefficient form (e.g. 29 -> "NoVt").
+        function groupAbbr(d) {
+            const ones = d % 10;
+            const tens = Math.floor(d / 10) % 10 * 10;
+            const hundreds = Math.floor(d / 100) * 100;
+            return (ones ? ABBR_ONES[ones] : '') + (tens ? ABBR_TENS[tens] : '') + (hundreds ? ABBR_HUNDREDS[hundreds] : '');
+        }
+        // Abbreviation for the n-th illion (n >= 1), computed on demand.
+        function makeIllion(n) {
+            if (n < 1) return '';
+            if (n <= 9) return ABBR_SMALL[n];
+            if (n <= 999) return groupAbbr(n);
+            // n >= 1000: base-1000 expansion with "Mi" (millia) markers.
+            const parts = [];
+            let pos = 0;
+            for (let x = n; x > 0; x = Math.floor(x / 1000), pos++) {
+                const d = x % 1000;
+                if (d === 0) continue;
+                if (pos === 0) parts.push({ pos, s: d <= 9 ? ABBR_SMALL[d] : groupAbbr(d) });
+                else parts.push({ pos, s: (d === 1 ? '' : groupAbbr(d)) + 'Mi'.repeat(pos) });
+            }
+            parts.sort((a, b) => b.pos - a.pos);
+            return parts.map(p => p.s).join('');
+        }
+
+        // ===== Formatting ====================================================
+        function formatNumber(num) {
+            // Fixed en-US grouping (commas) so values never look like decimals,
+            // e.g. "131,072" rather than the locale-dependent "131.072".
+            return (num % 1 === 0) ? num.toLocaleString('en-US')
+                : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function trimMantissa(m) {
+            const r = Math.round(m * 100) / 100;
+            return (r % 1 === 0) ? String(r) : r.toFixed(2).replace(/\.?0+$/, '');
+        }
+        function formatLead(x) {
+            const r = Math.round(x * 100) / 100;
+            return (r % 1 === 0) ? String(r) : r.toFixed(2).replace(/\.?0+$/, '');
+        }
+        // Render a big-number for display. Below one million → plain digits.
+        // From a million up → named (…, octillion, …, centillion). Beyond
+        // centillion, or when scientific mode is on → "1.23e+456" style.
+        function formatBig(b, sci) {
+            if (!b || b.m === 0) return '0';
+            if (b.e < 6) {
+                const val = Math.round(b.m * Math.pow(10, b.e) * 100) / 100;
+                return formatNumber(val);
+            }
+            if (sci || b.e > MAX_NAME_EXP) return trimMantissa(b.m) + 'e+' + b.e;
+            const groupExp = Math.floor(b.e / 3) * 3;
+            const n = groupExp / 3 - 1;
+            const lead = b.m * Math.pow(10, b.e - groupExp);
+            return formatLead(lead) + ' ' + makeIllion(n);
+        }
+
+        // ===== State =========================================================
+        let currentChance = bn(1, 0);
+        let bestNormal = bn(1, 0), countNormal = 1;
+        let coins = bn(0, 0);
+        let luckLevel = 0, coinLevel = 0, clickLevel = 0;
+        let scientific = false;
+        let autoOwned = false, autoOn = false, autoTimer = null;
+        let historyData = []; // [{ val: {m,e} }]
+        let loadedTs = null;            // timestamp from the last save (for offline calc)
+        let pendingOffline = null;      // offline coins awaiting CLAIM
+        const OFFLINE_CAP = 500000;     // max attempts simulated for offline progress
 
         const SAVE_KEY = 'luckyGrowSave';
+
+        function toBN(x) {
+            if (x && typeof x === 'object' && 'm' in x && 'e' in x) return { m: x.m, e: x.e };
+            if (typeof x === 'number') return bnFromNumber(x);
+            return null;
+        }
 
         function saveState() {
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify({
-                    bestNormal, countNormal, bestExp, countExp, historyData,
+                    bestNormal, countNormal, coins, luckLevel, coinLevel, clickLevel,
+                    scientific, autoOwned, autoOn, historyData,
+                    chance: parseFloat(document.getElementById('chanceInput').value) || 0.1,
+                    ts: Date.now(),
                     lang: document.getElementById('langSelect').value
                 }));
             } catch (e) { /* storage unavailable (e.g. private mode) */ }
+        }
+
+        // Throttled save: writes at most every 400ms so the auto clicker (25/sec)
+        // doesn't hammer localStorage, while a trailing write captures the latest.
+        let lastSave = 0, pendingSave = null;
+        function saveSoon() {
+            const now = Date.now();
+            if (now - lastSave >= 400) { lastSave = now; saveState(); }
+            else if (!pendingSave) pendingSave = setTimeout(() => { pendingSave = null; lastSave = Date.now(); saveState(); }, 400);
         }
 
         function loadState() {
@@ -177,28 +475,208 @@
                 const raw = localStorage.getItem(SAVE_KEY);
                 if (!raw) return;
                 const s = JSON.parse(raw);
-                bestNormal = s.bestNormal ?? 1;
+                bestNormal = toBN(s.bestNormal) || bn(1, 0);
                 countNormal = s.countNormal ?? 1;
-                bestExp = s.bestExp ?? 1;
-                countExp = s.countExp ?? 1;
-                historyData = Array.isArray(s.historyData) ? s.historyData : [];
+                coins = toBN(s.coins) || bn(0, 0);
+                luckLevel = s.luckLevel ?? 0;
+                coinLevel = s.coinLevel ?? 0;
+                clickLevel = s.clickLevel ?? 0;
+                scientific = !!s.scientific;
+                autoOwned = !!s.autoOwned;
+                autoOn = !!s.autoOn;
+                loadedTs = s.ts ?? null;
+                if (s.chance != null && isFinite(s.chance)) {
+                    document.getElementById('chanceInput').value = s.chance;
+                    document.getElementById('chanceRange').value = Math.min(99.9, Math.max(0.1, s.chance));
+                }
+                historyData = Array.isArray(s.historyData)
+                    ? s.historyData.map(it => {
+                        const v = toBN(it && it.val !== undefined ? it.val : it);
+                        return v ? { val: v } : null;
+                    }).filter(Boolean)
+                    : [];
                 if (s.lang) document.getElementById('langSelect').value = s.lang;
             } catch (e) { /* ignore corrupt save */ }
         }
 
         const i18n = {
-            ru: { push: "ЖМИ", rec: "РЕКОРД", expRec: "ЭКСП. РЕКОРД", in: "из", label: "ШАНС УСПЕХА", exp: "Экспериментальный режим", reset: "СБРОС", hist: "ТОП ВЫПАДЕНИЙ", confirm: "Сбросить текущий рекорд?" },
-            en: { push: "PUSH", rec: "RECORD", expRec: "EXP. RECORD", in: "in", label: "SET CHANCE", exp: "Experimental Mode", reset: "RESET", hist: "TOP DROPS", confirm: "Reset current record?" },
-            uk: { push: "ТИСНИ", rec: "РЕКОРД", expRec: "ЕКСП. РЕКОРД", in: "з", label: "ШАНС УСПІХУ", exp: "Експериментальний режим", reset: "СКИДАННЯ", hist: "ТОП ВИПАДІНЬ", confirm: "Скинути?" },
-            de: { push: "DRÜCKEN", rec: "REKORD", expRec: "EXP. REKORD", in: "in", label: "CHANCE EINSTELLEN", exp: "Experimenteller Modus", reset: "RESET", hist: "BESTE DROPS", confirm: "Zurücksetzen?" },
-            jp: { push: "押す", rec: "最高記録", expRec: "実験記録", in: "の", label: "確率設定", exp: "実験モード", reset: "リセット", hist: "ランキング", confirm: "リセット?" }
-            // ... остальные языки подхватятся через дефолт 'en' или добавятся автоматически
+            ru: { push: "ЖМИ", rec: "РЕКОРД", in: "из", label: "ШАНС УСПЕХА", reset: "СБРОС", hist: "ТОП ВЫПАДЕНИЙ", confirm: "Сбросить текущий рекорд?", shop: "МАГАЗИН", luck: "УДАЧА", luckDesc: "Меньше провалов", coinBonus: "БОНУС МОНЕТ", coinDesc: "Больше монет за победу", clickUp: "МУЛЬТИ-КЛИК", clickDesc: "Каждое нажатие сильнее", auto: "АВТОКЛИКЕР", autoDesc: "Авто-клик 25/сек", owned: "КУПЛЕНО", buy: "КУПИТЬ", buyMax: "КУПИТЬ МАКС", sci: "Научные числа" },
+            en: { push: "PUSH", rec: "RECORD", in: "in", label: "SET CHANCE", reset: "RESET", hist: "TOP DROPS", confirm: "Reset current record?", shop: "SHOP", luck: "LUCK", luckDesc: "Fewer failures", coinBonus: "COIN BONUS", coinDesc: "More coins per win", clickUp: "MULTI-CLICK", clickDesc: "Each push counts more", auto: "AUTO CLICKER", autoDesc: "Auto-clicks 25/sec", owned: "OWNED", buy: "BUY", buyMax: "BUY MAX", sci: "Scientific Numbers", welcomeBack: "WELCOME BACK", offFor: "You were offline for", offMade: "While offline you made", offCoins: "coins", offClaim: "CLAIM" },
+            uk: { push: "ТИСНИ", rec: "РЕКОРД", in: "з", label: "ШАНС УСПІХУ", reset: "СКИДАННЯ", hist: "ТОП ВИПАДІНЬ", confirm: "Скинути?", shop: "МАГАЗИН", luck: "УДАЧА", luckDesc: "Менше провалів", coinBonus: "БОНУС МОНЕТ", coinDesc: "Більше монет за перемогу", clickUp: "МУЛЬТИ-КЛІК", clickDesc: "Кожне натискання сильніше", auto: "АВТОКЛІКЕР", autoDesc: "Авто-клік 25/сек", owned: "КУПЛЕНО", buy: "КУПИТИ", buyMax: "КУПИТИ МАКС", sci: "Наукові числа" },
+            de: { push: "DRÜCKEN", rec: "REKORD", in: "in", label: "CHANCE EINSTELLEN", reset: "RESET", hist: "BESTE DROPS", confirm: "Zurücksetzen?", shop: "SHOP", luck: "GLÜCK", luckDesc: "Weniger Fehlschläge", coinBonus: "MÜNZ-BONUS", coinDesc: "Mehr Münzen pro Sieg", clickUp: "MULTI-KLICK", clickDesc: "Jeder Druck zählt mehr", auto: "AUTO-KLICKER", autoDesc: "Klickt 25/Sek", owned: "GEKAUFT", buy: "KAUFEN", buyMax: "MAX KAUFEN", sci: "Wissenschaftliche Zahlen" },
+            jp: { push: "押す", rec: "最高記録", in: "の", label: "確率設定", reset: "リセット", hist: "ランキング", confirm: "リセット?", shop: "ショップ", luck: "運", luckDesc: "失敗が減る", coinBonus: "コインボーナス", coinDesc: "勝利で多くのコイン", clickUp: "マルチクリック", clickDesc: "1回の押下がより強力", auto: "オートクリッカー", autoDesc: "毎秒25回クリック", owned: "購入済み", buy: "購入", buyMax: "最大購入", sci: "科学的表記" }
+            // остальные языки подхватятся через дефолт 'en'
         };
 
-        function formatNumber(num) {
-            return (num % 1 === 0) ? num.toLocaleString() : num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        function lang() { return document.getElementById('langSelect').value; }
+        function dict() { return i18n[lang()] || i18n['en']; }
+        // Per-key lookup with English fallback (for keys not translated everywhere).
+        function t(k) { const d = dict(); return d[k] !== undefined ? d[k] : i18n['en'][k]; }
+
+        // ===== Upgrades ======================================================
+        const MAX_CLICKS = 10000;                            // cap so one push never lags
+        function luckMult() { return 1 + luckLevel; }       // failure chance ÷ this
+        function coinMult() { return 1 + coinLevel; }       // coins × this
+        function clicksPerPush() { return Math.min(1 + clickLevel, MAX_CLICKS); } // attempts/push
+
+        // Each upgrade follows cost(level) = base × growth^level. `cap` is the
+        // highest purchasable level index (MULTI-CLICK is capped; others aren't).
+        const UPGRADES = [
+            { base: 100,  growth: 25, cap: Infinity,       get: () => luckLevel,  add: k => { luckLevel += k; } },
+            { base: 50,   growth: 15, cap: Infinity,       get: () => coinLevel,  add: k => { coinLevel += k; } },
+            { base: 1000, growth: 30, cap: MAX_CLICKS - 2, get: () => clickLevel, add: k => { clickLevel += k; } }
+        ];
+        function upCost(up) { const L = up.get(); return L > up.cap ? null : bnFromBaseGrowth(up.base, up.growth, L); }
+        function luckCost() { return upCost(UPGRADES[0]); }
+        function coinCost() { return upCost(UPGRADES[1]); }
+        function clickCost() { return upCost(UPGRADES[2]); }
+
+        function buyOne(up) {
+            const cost = upCost(up);
+            if (!cost || bnCompare(coins, cost) < 0) return false;
+            coins = bnSub(coins, cost);
+            up.add(1);
+            return true;
+        }
+        function buyLuck() { if (buyOne(UPGRADES[0])) { updateCoins(); updateShop(); saveState(); } }
+        function buyCoin() { if (buyOne(UPGRADES[1])) { updateCoins(); updateShop(); saveState(); } }
+        function buyClick() { if (buyOne(UPGRADES[2])) { updateCoins(); updateShop(); saveState(); } }
+
+        // ----- Auto clicker: one-time unlock, toggled from the settings card ----
+        const AUTO_COST = bn(1, 5); // 100,000 coins
+        function autoCost() { return autoOwned ? null : AUTO_COST; }
+        function buyAuto() {
+            if (autoOwned || bnCompare(coins, AUTO_COST) < 0) return;
+            coins = bnSub(coins, AUTO_COST);
+            autoOwned = true;
+            updateCoins(); updateShop(); updateAutoBtn(); saveState();
+        }
+        function startAuto() {
+            if (autoTimer) return;
+            autoTimer = setInterval(tryLuck, 40); // ~25 clicks/sec
+            document.getElementById('mainButton').classList.add('auto-running');
+        }
+        function stopAuto() {
+            if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+            document.getElementById('mainButton').classList.remove('auto-running');
+        }
+        function toggleAuto() {
+            if (!autoOwned) return;
+            autoOn = !autoOn;
+            if (autoOn) startAuto(); else stopAuto();
+            updateAutoBtn();
+            saveState();
+        }
+        function updateAutoBtn() {
+            const btn = document.getElementById('autoBtn');
+            btn.innerText = dict().auto + ': ' + (autoOn ? 'ON' : 'OFF');
+            btn.classList.toggle('on', autoOn && autoOwned);
+            btn.classList.toggle('disabled', !autoOwned);
         }
 
+        // ----- Offline progress: 1 click/sec while away, scaled by upgrades -----
+        function formatDuration(sec) {
+            const d = Math.floor(sec / 86400); sec %= 86400;
+            const h = Math.floor(sec / 3600); sec %= 3600;
+            const m = Math.floor(sec / 60); const s = sec % 60;
+            const parts = [];
+            if (d) parts.push(d + 'd');
+            if (h) parts.push(h + 'h');
+            if (m) parts.push(m + 'min');
+            parts.push(s + 'sec');
+            return parts.join(' ');
+        }
+
+        // Simulate the away time and return coins earned. Uses the player's saved
+        // chance and all upgrades (luck, coin bonus, multi-click), so the reward
+        // scales with their progress. Owning the auto clicker raises the offline
+        // rate from 1 to 10 clicks/sec. Capped so it never lags on return.
+        function offlineClicksPerSec() { return autoOwned ? 10 : 1; }
+        function simulateOffline(seconds) {
+            const p = (parseFloat(document.getElementById('chanceInput').value) || 0.1) / 100;
+            const invP = 1 / p;
+            const successChance = 1 - (1 - p) / luckMult();
+            const cm = coinMult();
+            const attempts = Math.min(seconds * offlineClicksPerSec() * clicksPerPush(), OFFLINE_CAP);
+            let local = bn(1, 0);
+            let earned = bn(0, 0);
+            for (let i = 0; i < attempts; i++) {
+                if (Math.random() < successChance) {
+                    local = bnMulNum(local, invP);
+                    earned = bnAdd(earned, bnMulNum(local, cm));
+                } else {
+                    local = bn(1, 0);
+                }
+            }
+            return earned;
+        }
+
+        function checkOffline() {
+            if (!loadedTs) return;
+            const offlineSec = Math.floor((Date.now() - loadedTs) / 1000);
+            if (offlineSec < 10) return; // ignore quick refreshes
+            const earned = simulateOffline(offlineSec);
+            if (earned.m === 0) return;
+            pendingOffline = earned;
+            document.getElementById('offlineTitle').innerText = t('welcomeBack');
+            document.getElementById('offlineText').innerHTML =
+                `${t('offFor')} <b>${formatDuration(offlineSec)}</b>.<br>${t('offMade')} ` +
+                `<span class="coins-amt">${formatBig(earned, scientific)}</span> ${t('offCoins')}!`;
+            document.getElementById('offlineOk').innerText = t('offClaim');
+            document.getElementById('offlineModal').style.display = 'flex';
+        }
+
+        function claimOffline() {
+            if (pendingOffline) { coins = bnAdd(coins, pendingOffline); pendingOffline = null; }
+            document.getElementById('offlineModal').style.display = 'none';
+            updateCoins(); updateShop(); saveState();
+        }
+
+        // Buy the most levels possible across all upgrades, balanced by marginal
+        // cost. Solved in closed form (geometric series + a log-space search) so
+        // it stays instant even when you can afford billions of levels.
+        function bnLog10(a) { return a.m === 0 ? -Infinity : a.e + Math.log10(a.m); }
+        function buyMaxAll() {
+            // plan(t): buy every level whose cost <= 10^t. Returns total + per-upgrade counts.
+            function plan(t) {
+                let total = bn(0, 0);
+                const buys = [];
+                for (const up of UPGRADES) {
+                    const L = up.get();
+                    const topIdx = Math.min(Math.floor((t - Math.log10(up.base)) / Math.log10(up.growth)), up.cap);
+                    const k = Math.max(0, topIdx - L + 1);
+                    buys.push(k);
+                    if (k > 0) {
+                        const c0 = bnFromBaseGrowth(up.base, up.growth, L);
+                        const ck = bnFromBaseGrowth(up.base, up.growth, L + k);
+                        total = bnAdd(total, bnMulNum(bnSub(ck, c0), 1 / (up.growth - 1)));
+                    }
+                }
+                return { total, buys };
+            }
+            // Each pass spends most of the remaining coins; repeat until the
+            // leftover can't afford another level (converges in a few passes).
+            let changed = false;
+            if (!autoOwned && bnCompare(coins, AUTO_COST) >= 0) {
+                coins = bnSub(coins, AUTO_COST); autoOwned = true; changed = true;
+            }
+            for (let pass = 0; pass < 50; pass++) {
+                if (bnLog10(coins) === -Infinity) break;
+                let lo = 0, hi = bnLog10(coins) + 1;
+                for (let i = 0; i < 64; i++) {
+                    const mid = (lo + hi) / 2;
+                    if (bnCompare(plan(mid).total, coins) <= 0) lo = mid; else hi = mid;
+                }
+                const fin = plan(lo);
+                if (fin.buys.every(k => k === 0)) break;
+                UPGRADES.forEach((up, i) => up.add(fin.buys[i]));
+                coins = bnSub(coins, fin.total);
+                changed = true;
+            }
+            if (changed) { updateCoins(); updateShop(); updateAutoBtn(); saveState(); }
+        }
+
+        // ===== Inputs ========================================================
         function syncFromSlider(val) {
             document.getElementById('chanceInput').value = val;
             const hue = 150 - (val * 1.5);
@@ -213,116 +691,186 @@
             resetGame();
         }
 
+        // ===== Core gameplay =================================================
+        // A push runs clicksPerPush() independent attempts. A win multiplies the
+        // rarity and pays coins equal to it; a loss resets the streak. To stay
+        // fast even with a high MULTI-CLICK level, per-attempt work is kept
+        // minimal and the UI is refreshed only once, after the whole batch.
         function tryLuck() {
-            const chancePercent = parseFloat(document.getElementById('chanceInput').value);
-            const chanceDecimal = chancePercent / 100;
-            const isExp = document.getElementById('expCheck').checked;
+            const times = clicksPerPush();
+            const p = (parseFloat(document.getElementById('chanceInput').value) || 0.1) / 100;
+            const invP = 1 / p;
+            const successChance = 1 - (1 - p) / luckMult();
+            const cm = coinMult();
+            const THRESH = bn(255, 0);
 
-            if (isExp || Math.random() < chanceDecimal) {
-                currentChance = currentChance / chanceDecimal;
+            let lastWin = true;
+            let batchPeak = currentChance; // highest rarity reached this push
 
-                if (currentChance > 255) {
-                    historyData.push({ val: currentChance, isExp: isExp });
-                    historyData.sort((a, b) => b.val - a.val);
-                    if (historyData.length > 25) historyData.pop();
-                    renderHistory();
-                }
-
-                updateDisplayVisuals(currentChance);
-
-                const currentStr = currentChance.toFixed(2);
-                if (isExp) {
-                    if (currentChance > bestExp + 0.001) { bestExp = currentChance; countExp = 1; }
-                    else if (currentStr === bestExp.toFixed(2)) countExp++;
+            for (let i = 0; i < times; i++) {
+                if (Math.random() < successChance) {
+                    currentChance = bnMulNum(currentChance, invP);
+                    coins = bnAdd(coins, bnMulNum(currentChance, cm));
+                    if (bnCompare(currentChance, batchPeak) > 0) batchPeak = currentChance;
+                    lastWin = true;
                 } else {
-                    if (currentChance > bestNormal + 0.001) { bestNormal = currentChance; countNormal = 1; }
-                    else if (currentStr === bestNormal.toFixed(2)) countNormal++;
+                    // Bank the peak of the streak that just ended (if notable).
+                    if (bnCompare(currentChance, THRESH) > 0) historyData.push({ val: currentChance });
+                    currentChance = bn(1, 0);
+                    lastWin = false;
                 }
-                updateBestVisuals();
-                saveState();
-            } else {
-                resetGame();
+            }
+            // The still-running streak's value is also a candidate top drop.
+            if (bnCompare(currentChance, THRESH) > 0) historyData.push({ val: currentChance });
+
+            if (bnCompare(batchPeak, bestNormal) > 0) { bestNormal = batchPeak; countNormal = 1; }
+            else if (bnKey(batchPeak) === bnKey(bestNormal)) countNormal++;
+
+            historyData.sort((a, b) => bnCompare(b.val, a.val));
+            if (historyData.length > 25) historyData.length = 25;
+
+            renderHistory();
+            updateDisplayVisuals(currentChance);
+            updateBestVisuals();
+            updateCoins();
+            updateShop();
+            saveSoon();
+
+            if (!lastWin) {
                 const display = document.getElementById('chance-display');
                 display.style.color = "#ff4444";
                 setTimeout(() => display.style.color = "var(--primary)", 200);
             }
         }
 
+        // ===== Rendering =====================================================
+        function formatChanceText(b) {
+            const v = formatBig(b, scientific);
+            const l = lang();
+            const d = dict();
+            return (l === 'jp' || l === 'zh' || l === 'ko') ? `${v} ${d.in || 'in'} 1` : `1 ${d.in || 'in'} ${v}`;
+        }
+
         function renderHistory() {
-            const l = document.getElementById('langSelect').value;
             const list = document.getElementById('historyList');
             list.innerHTML = "";
-
             historyData.forEach((item, index) => {
                 const div = document.createElement('div');
-                div.className = 'history-item' + (index === 0 ? ' top-rank' : '') + (item.isExp ? ' is-exp' : '');
-
-                const valText = formatChanceText(item.val, l);
-                const tag = item.isExp ? `<span class="exp-tag">EXP</span>` : '';
-
-                div.innerHTML = `<span>#${index+1}</span> <span>${valText}${tag}</span>`;
+                div.className = 'history-item' + (index === 0 ? ' top-rank' : '');
+                div.innerHTML = `<span>#${index + 1}</span> <span>${formatChanceText(item.val)}</span>`;
                 list.appendChild(div);
             });
         }
 
-        function formatChanceText(val, lang) {
-            const v = formatNumber(val);
-            const d = i18n[lang] || i18n['en'];
-            return (lang === 'jp' || lang === 'zh' || lang === 'ko') ? `${v} ${d.in || 'in'} 1` : `1 ${d.in || 'in'} ${v}`;
-        }
-
-        function updateDisplayVisuals(val) {
-            const l = document.getElementById('langSelect').value;
+        function updateDisplayVisuals(b) {
             const display = document.getElementById('chance-display');
-            display.innerText = formatChanceText(val, l);
-            if (val >= 1000) display.style.color = document.getElementById('expCheck').checked ? "var(--exp)" : "var(--accent)";
+            display.innerText = formatChanceText(b);
+            display.style.color = bnCompare(b, bn(1000, 0)) >= 0 ? "var(--accent)" : "var(--primary)";
         }
 
         function updateBestVisuals() {
-            const l = document.getElementById('langSelect').value;
-            const isExp = document.getElementById('expCheck').checked;
-            const best = isExp ? bestExp : bestNormal;
-            const count = isExp ? countExp : countNormal;
-            const d = i18n[l] || i18n['en'];
-
-            document.getElementById('recordLabel').innerText = isExp ? d.expRec : d.rec;
-            document.getElementById('highScoreValue').innerText = formatChanceText(best, l);
-
+            const d = dict();
+            document.getElementById('recordLabel').innerText = d.rec;
+            document.getElementById('highScoreValue').innerText = formatChanceText(bestNormal);
             const mult = document.getElementById('multiplierDisplay');
-            mult.innerText = count > 1 ? `x${count}` : "";
-            mult.className = count > 1 ? "multiplier" : "";
+            mult.innerText = countNormal > 1 ? `x${countNormal}` : "";
+            mult.className = countNormal > 1 ? "multiplier" : "";
         }
 
-        function changeLanguage() {
-            const l = document.getElementById('langSelect').value;
-            const d = i18n[l] || i18n['en'];
-            document.getElementById('mainButton').innerText = d.push;
-            document.getElementById('chanceLabel').innerText = d.label;
-            document.getElementById('expLabel').innerText = d.exp;
-            document.getElementById('resetBtn').innerText = d.reset;
-            document.getElementById('histTitle').innerText = d.hist;
-            renderHistory();
-            updateBestVisuals();
+        function updateCoins() {
+            document.getElementById('coinsValue').innerText = formatBig(coins, scientific);
+        }
+
+        function updateShop() {
+            const d = dict();
+            document.getElementById('shopTitle').innerText = d.shop;
+            document.getElementById('luckName').innerText = d.luck;
+            document.getElementById('luckDesc').innerText = d.luckDesc;
+            document.getElementById('coinName').innerText = d.coinBonus;
+            document.getElementById('coinDesc').innerText = d.coinDesc;
+            document.getElementById('clickName').innerText = d.clickUp;
+            document.getElementById('clickDesc').innerText = d.clickDesc;
+            document.getElementById('luckBuy').innerText = d.buy;
+            document.getElementById('coinBuy').innerText = d.buy;
+            document.getElementById('clickBuy').innerText = d.buy;
+            document.getElementById('buyMaxBtn').innerText = d.buyMax;
+
+            document.getElementById('luckLevel').innerText = luckLevel;
+            document.getElementById('coinLevelTxt').innerText = coinLevel;
+            document.getElementById('clickLevelTxt').innerText = clickLevel;
+            document.getElementById('luckEffect').innerText = 'fail ÷' + luckMult();
+            document.getElementById('coinEffect').innerText = 'coins ×' + coinMult();
+            document.getElementById('clickEffect').innerText = 'push ×' + clicksPerPush();
+
+            const lc = luckCost(), cc = coinCost(), kc = clickCost();
+            document.getElementById('luckCost').innerText = formatBig(lc, scientific);
+            document.getElementById('coinCost').innerText = formatBig(cc, scientific);
+            document.getElementById('clickCost').innerText = kc ? formatBig(kc, scientific) : 'MAX';
+            document.getElementById('luckUpgrade').classList.toggle('locked', bnCompare(coins, lc) < 0);
+            document.getElementById('coinUpgrade').classList.toggle('locked', bnCompare(coins, cc) < 0);
+            document.getElementById('clickUpgrade').classList.toggle('locked', !kc || bnCompare(coins, kc) < 0);
+
+            // Auto clicker (one-time unlock).
+            document.getElementById('autoName').innerText = d.auto;
+            document.getElementById('autoDesc').innerText = d.autoDesc;
+            const ac = autoCost();
+            document.getElementById('autoCoinIcon').style.display = autoOwned ? 'none' : '';
+            if (autoOwned) {
+                document.getElementById('autoBuy').innerText = '✓';
+                document.getElementById('autoCostTxt').innerText = d.owned;
+                document.getElementById('autoUpgrade').classList.add('locked');
+            } else {
+                document.getElementById('autoBuy').innerText = d.buy;
+                document.getElementById('autoCostTxt').innerText = formatBig(ac, scientific);
+                document.getElementById('autoUpgrade').classList.toggle('locked', bnCompare(coins, ac) < 0);
+            }
+
+            const canAny = bnCompare(coins, lc) >= 0 || bnCompare(coins, cc) >= 0
+                || (kc && bnCompare(coins, kc) >= 0) || (ac && bnCompare(coins, ac) >= 0);
+            document.getElementById('buyMaxBtn').classList.toggle('locked', !canAny);
+        }
+
+        function refreshAllDisplays() {
             updateDisplayVisuals(currentChance);
+            updateBestVisuals();
+            updateCoins();
+            updateShop();
+            renderHistory();
+        }
+
+        function updateSciBtn() {
+            const btn = document.getElementById('sciBtn');
+            btn.innerText = dict().sci + ': ' + (scientific ? 'ON' : 'OFF');
+            btn.classList.toggle('on', scientific);
+        }
+
+        function toggleScientific() {
+            scientific = !scientific;
+            updateSciBtn();
+            refreshAllDisplays();
             saveState();
         }
 
-        function toggleExpMode() {
-            resetGame();
-            updateBestVisuals();
-            renderHistory();
+        function changeLanguage() {
+            const d = dict();
+            document.getElementById('mainButton').innerText = d.push;
+            document.getElementById('chanceLabel').innerText = d.label;
+            document.getElementById('resetBtn').innerText = d.reset;
+            document.getElementById('histTitle').innerText = d.hist;
+            updateSciBtn();
+            updateAutoBtn();
+            refreshAllDisplays();
+            saveState();
         }
 
         function resetGame() {
-            currentChance = 1;
-            updateDisplayVisuals(1);
+            currentChance = bn(1, 0);
+            updateDisplayVisuals(currentChance);
         }
 
         function confirmReset() {
-            const l = document.getElementById('langSelect').value;
-            if (confirm(i18n[l]?.confirm || "Reset?")) {
-                if (document.getElementById('expCheck').checked) { bestExp = 1; countExp = 1; }
-                else { bestNormal = 1; countNormal = 1; }
+            if (confirm(dict().confirm || "Reset?")) {
+                bestNormal = bn(1, 0); countNormal = 1;
                 updateBestVisuals();
                 saveState();
             }
@@ -368,7 +916,14 @@
 
         loadState();
         changeLanguage();
-        renderHistory();
+        // Resume the auto clicker if it was running when the game was last saved.
+        if (autoOwned && autoOn) startAuto();
+        // Award offline progress (1 click/sec while away) and show the claim modal.
+        checkOffline();
+
+        // Record the exact leave time so the offline calc is accurate.
+        window.addEventListener('beforeunload', () => { try { saveState(); } catch (e) {} });
+        document.addEventListener('visibilitychange', () => { if (document.hidden) { try { saveState(); } catch (e) {} } });
     </script>
 </body>
 </html>
